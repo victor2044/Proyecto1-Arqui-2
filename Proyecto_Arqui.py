@@ -27,17 +27,21 @@ class processor(threading.Thread):
 
     def run (self):
         i = 0
-        while i < 10:
+        while i < 2:
             i+=1
-            aleat = randint(0,2)
-            #aleat = 0
+            #aleat = randint(0,2)
+            aleat = 0
 
-            if aleat == 0: 
+            if aleat == 0:
                 self.write()
+                self.cache.monitoreo()
+
             elif aleat == 1:
+                self.cache.monitoreo()
                 self.read()
             else:
-               self.processing()
+                self.cache.monitoreo()
+                self.processing()
 
 class cache(threading.Thread):
     mem_cache = [(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0)]
@@ -86,19 +90,24 @@ class cache(threading.Thread):
             new_data= index[1]
             return new_data
 
-    def run (run):
+    def monitoreo(self):
+        instr = self.control.snoop()
+        print ("estoy corriendo")
+        print ("estoy aqui :")
+        print (instr)
+        if instr:
+            index = self.mem_cache[instr[2]]
+            data = index[1]
+            if instr[0] == 0:
+                self.mem_cache[instr[2]] = (1,data)
+                print ("cache actualizada por lectura")
+            else:
+                self.mem_cache[instr[2]] = (2,data)
+                print ("cache actualizada por escritura")
+
+    def run (self):
         while True:
-            instr = self.control.snoop()
-            print ("estoy corriendo")
-            if instr:
-                index = mem_cache[instr[2]]
-                data = index[1]
-                if instr[0] == 0:
-                    mem_cache[instr[2]] = (1,data)
-                    print ("cache actualizada por lectura")
-                else:
-                    mem_cache[instr[2]] = (2,data)
-                    print ("cache actualizada por escritura")
+            a=1
         
 
 class control_unit(threading.Thread):
@@ -135,14 +144,18 @@ class control_unit(threading.Thread):
     def snoop (self):
         work = bus.snoop()
         if work:
-            instr = work[0]
-            if instr[1]!= self.name:
+            if work[1]!= self.name:
                 print ("actualizando cache snoop")
-                return instr
+                return work
+
+    def run (self):
+        while True:
+            a=1
                     
     
 class bus (threading.Thread):    
     queue = deque([])
+    q_snoop = deque([])
     
     def __init__(self,name,memory):
         threading.Thread.__init__(self)
@@ -168,6 +181,9 @@ class bus (threading.Thread):
 
     def bus_princ (self,prot):
         self.queue.append(prot)
+        self.q_snoop.append(prot)
+        print (self.queue)
+        print (self.q_snoop)
         while self.queue:
             if prot[0]== 1:
                 self.bus_w()
@@ -176,7 +192,13 @@ class bus (threading.Thread):
                 return read
 
     def snoop(self):
-        return self.queue
+        if self.q_snoop: 
+            instr = self.q_snoop.popleft()
+            return instr
+
+    def run (self):
+        while True:
+            a=1
         
     
 class memory (threading.Thread):
@@ -193,6 +215,10 @@ class memory (threading.Thread):
     def read (self, pos):
         data = self.mem_princ[pos]
         return data
+
+    def run (self):
+        while True:
+            a=1
             
                     
 princ_mem = memory("principal_memory")
@@ -203,10 +229,14 @@ cache1 = cache("1", control_unit1, bus)
 cache2 = cache("2", control_unit2, bus)
 core1 = processor("1",cache1)
 core2 = processor("2",cache2)
-core1.start()
-core2.start()
+
+princ_mem.start()
+bus.start()
+control_unit1.start()
+control_unit2.start()
 cache1.start()
 cache2.start()
+core1.start()
+core2.start()
 
-cache1.join()
 core1.join()
