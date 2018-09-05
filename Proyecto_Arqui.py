@@ -16,13 +16,15 @@ class processor(threading.Thread):
         mutex.acquire()
         print ("core " + self.name +" escribiendo\n")
         mutex.release()
-        self.cache.write(0,1)
+        pos = randint(0,15)
+        data = randint(0,64)
+        self.cache.write(pos,data)
 
     def read (self):
         mutex.acquire()
         print ("core " + self.name +" leyendo\n")
         mutex.release()
-        pos = 0
+        pos = randint(0,15)
         data = self.cache.read(pos)
 
     def processing (self):
@@ -47,12 +49,12 @@ class processor(threading.Thread):
                 self.processing()
 
 class cache(threading.Thread):
-    mem_cache = [(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0)]
     global mutex
     
     def __init__(self, name, bus):
         threading.Thread.__init__(self)
         self.name = name
+        self.mem_cache = [(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0)]
         self.control = control_unit(name,bus,self.mem_cache)
         self.control.start()
         self.bus = bus
@@ -86,14 +88,14 @@ class cache(threading.Thread):
             print ("cache miss in the core " +self.name+",in the position :", pos)
             mutex.release()
             time.sleep(0.25)
-            data = -1
+            data = index[1]
             prot = [0,self.name,pos, data]
             self.bus.bus_princ(prot)
             while True:
                 if self.bus.q_read:
                     break
             while True:
-                read = self.bus.q_read[-1]
+                read = self.bus.q_read[0]
                 if (read[0] == self.name and
                     read[1] == pos):
                     break
@@ -105,13 +107,11 @@ class cache(threading.Thread):
             return new_data
 
     def run (self):
-        i=0
         while True:
-            i+=1
             mutex.acquire()
             print("memory cache of the core "+ self. name+" " , self.mem_cache)
             mutex.release()
-            time.sleep(1)
+            time.sleep(0.5)
         
 
 class control_unit(threading.Thread):
@@ -163,15 +163,17 @@ class control_unit(threading.Thread):
 
     def run (self):
         while True:
-            #instruccion [0,"1",2,45]
             instr = self.bus.snoop()
+            pos = instr[2]
+            data = self.mem_cache[pos]
+            data1 = data[1]
             if instr:
                 if (instr[0] == 1 and
                     instr[1] != self.name):
-                    self.mem_cache[instr[2]] = (1, self.mem_cache[instr[2]][1])
-                elif (instr[0] == 1 and
-                    instr[1] == self.name):
-                    self.mem_cache[instr[2]] = (2,instr[3])
+                   self.mem_cache[instr[2]] = (1, data1)
+                #elif (instr[0] == 1 and
+                #    instr[1] == self.name):
+                #    self.mem_cache[instr[2]] = (2,instr[3])
                 elif (instr[0] == 0 and
                       instr[1] != self.name and
                       self.mem_cache[instr[2]][0] == 2):
@@ -207,7 +209,7 @@ class bus (threading.Thread):
             read = [name,pos,data]
             self.q_read.append(read)
             mutex.acquire()
-            print ("lsuccessful reading in the bus")
+            print ("successful reading in the bus")
             mutex.release()
 
     def bus_princ (self,prot):
@@ -256,7 +258,7 @@ class memory (threading.Thread):
             print("Memoria Principal " , self.mem_princ)
             print("//////////////////////////////////")
             mutex.release()
-            time.sleep(1)
+            time.sleep(0.5)
 
 mutex = threading.Lock()
             
