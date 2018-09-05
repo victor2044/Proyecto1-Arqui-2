@@ -39,7 +39,7 @@ class processor(threading.Thread):
                 self.read()
                 
             else:
-                self.cache.monitoreo()
+                #self.cache.monitoreo()
                 self.processing()
 
 class cache(threading.Thread):
@@ -49,13 +49,13 @@ class cache(threading.Thread):
     def __init__(self, name, control_unit, bus):
         threading.Thread.__init__(self)
         self.name = name
-        self.control = control_unit (self.men_cache)
+        self.control = control_unit
         self.bus = bus
         self.stoprequest = threading.Event()
         
     def write(self,pos,data):
         mutex.acquire()
-        self.monitoreo()
+        #self.monitoreo()
         index = self.mem_cache[pos]
         msi = index[0]
         validate = self.control.write(msi)
@@ -76,7 +76,8 @@ class cache(threading.Thread):
             self.mem_cache[pos] = (2,new_data[2])      
                    
     def read(self,pos):
-        self.monitoreo()
+        #self.monitoreo()
+        mutex.acquire()
         index = self.mem_cache[pos]
         msi = index[0]
         validate = self.control.read(msi)
@@ -96,23 +97,22 @@ class cache(threading.Thread):
             new_data= index[1]
             return new_data
 
-    def monitoreo(self):
-        instr = self.control.snoop()
-        print ("estoy aqui :")
-        print (instr)
-        if instr:
-            index = self.mem_cache[instr[2]]
-            data = index[1]
-            if instr[0] == 0:
-                self.mem_cache[instr[2]] = (1,data)
-                print ("cache actualizada por lectura" + self.name)
-            else:
-                self.mem_cache[instr[2]] = (2,data)
-                print ("cache actualizada por escritura" + self.name)
-
     def run (self):
-        while True:
-            a=1
+        i=0
+        while i< 5:
+            i+=1
+            instr = self.control.snoop()
+            print ("estoy aqui :")
+            print (instr)
+            if instr:
+                index = self.mem_cache[instr[2]]
+                data = index[1]
+                if instr[0] == 0:
+                    self.mem_cache[instr[2]] = (1,data)
+                    print ("cache actualizada por lectura" + self.name)
+                else:
+                    self.mem_cache[instr[2]] = (2,data)
+                    print ("cache actualizada por escritura" + self.name)
         
 
 class control_unit(threading.Thread):
@@ -120,7 +120,6 @@ class control_unit(threading.Thread):
     def __init__(self, name, bus):
         threading.Thread.__init__(self)
         self.name = name
-        self.mem_cache = 
         self.bus = bus
         self.stoprequest = threading.Event()
 
@@ -160,7 +159,7 @@ class control_unit(threading.Thread):
                     
     
 class bus (threading.Thread):    
-    queue = deque([])
+    queue = []
     q_snoop = deque([])
     
     def __init__(self,name,memory):
@@ -170,36 +169,38 @@ class bus (threading.Thread):
         self.stoprequest = threading.Event()
 
     def bus_w (self):
-            instr = self.queue.popleft()
+            instr = self.queue[0]
             pos = instr[2]
             data = instr[3]
             self.memory.write(pos,data)
             print ("escritura exitosa hacia memoria")
+            self.queue = []
 
     def bus_r (self):
-            instr = self.queue.popleft()
+            instr = self.queue[0]
             name = instr[1]
             pos = instr[2]
             data = self.memory.read(pos)
             read = [name,pos,data]
+            self.queue = []
             return read
             print ("lectura exitosa desde memoria")
 
     def bus_princ (self,prot):
         self.queue.append(prot)
-        self.q_snoop.append(prot)
+        #self.q_snoop.append(prot)
         print (self.queue)
-        print (self.q_snoop)
-        while self.queue:
-            if prot[0]== 1:
-                self.bus_w()
-            else:
-                read = self.bus_r()
-                return read
+        #print (self.q_snoop)
+        #while self.queue:
+        if prot[0]== 1:
+            self.bus_w()
+        else:
+            read = self.bus_r()
+            return read
 
     def snoop(self):
-        if self.q_snoop: 
-            instr = self.q_snoop.popleft()
+        if self.queue: 
+            instr = self.queue[0]
             return instr
 
     def run (self):
