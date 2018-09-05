@@ -4,6 +4,7 @@ from random import randint
 from collections import deque
  
 class processor(threading.Thread):
+    global mutex
     
     def __init__(self, name, cache):
         threading.Thread.__init__(self)
@@ -12,25 +13,29 @@ class processor(threading.Thread):
         self.stoprequest = threading.Event()
         
     def write (self):
+        mutex.acquire()
         print ("core " + self.name +" escribiendo\n")
+        mutex.release()
         self.cache.write(0,1)
 
     def read (self):
+        mutex.acquire()
         print ("core " + self.name +" leyendo\n")
+        mutex.release()
         pos = 0
         data = self.cache.read(pos)
-        print (data)
 
     def processing (self):
+        mutex.acquire()
         print ("core " + self.name +" processing\n")
+        mutex.release()
         time.sleep(1)
 
     def run (self):
         i = 0
-        while i < 2:
+        while True:
             i+=1
-            #aleat = randint(0,2)
-            aleat = 1
+            aleat = randint(0,2)
 
             if aleat == 1:
                 self.write()
@@ -39,128 +44,147 @@ class processor(threading.Thread):
                 self.read()
                 
             else:
-                #self.cache.monitoreo()
                 self.processing()
 
 class cache(threading.Thread):
     mem_cache = [(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0),(2,0)]
     global mutex
     
-    def __init__(self, name, control_unit, bus):
+    def __init__(self, name, bus):
         threading.Thread.__init__(self)
         self.name = name
-        self.control = control_unit
+        self.control = control_unit(name,bus,self.mem_cache)
+        self.control.start()
         self.bus = bus
         self.stoprequest = threading.Event()
         
     def write(self,pos,data):
-        mutex.acquire()
-        #self.monitoreo()
         index = self.mem_cache[pos]
         msi = index[0]
         validate = self.control.write(msi)
-        if validate == 0:
-            self.mem_cache[pos] = (validate,data)
-            prot = [1,self.name,pos, data]
-            time.sleep(2)
-            bus.bus_princ(prot)
-            mutex.release()
-            print ("escritura exitosa")
-            print (self.mem_cache)
-        elif validate == 1:
-            print ("cache miss in the position :" + pos)
-            time.sleep(2)
-            prot = [0,self.name,pos, data]
-            new_data = bus.bus_princ(prot)
-            mutex.release()
-            self.mem_cache[pos] = (2,new_data[2])      
+        self.mem_cache[pos] = (validate,data)
+        prot = [1,self.name,pos, data]
+        time.sleep(0.5)
+        bus.bus_princ(prot)
+        mutex.acquire()
+        print ("escritura exitosa in the core " +self.name+",in the position :", pos)
+        mutex.release()
                    
     def read(self,pos):
-        #self.monitoreo()
-        mutex.acquire()
         index = self.mem_cache[pos]
         msi = index[0]
         validate = self.control.read(msi)
         if validate == 0:
             new_data= index[1]
-            print ("lectura exitosa")
+            mutex.acquire()
+            print ("lectura exitosa in the core "+ self.name+",in the position :", pos)
+            mutex.release()
+            time.sleep(0.25)
             return new_data
         elif validate == 1:
-            print ("cache miss in the position :" + pos)
-            time.sleep(2)
-            prot = [0,self.name,pos, data]
-            new_data = bus.bus_princ(prot)
+            mutex.acquire()
+            print ("cache miss in the core " +self.name+",in the position :", pos)
             mutex.release()
-            self.mem_cache[pos] = (2,new_data[2])
-            return new_data[2]
+            time.sleep(0.25)
+            data = -1
+            prot = [0,self.name,pos, data]
+            self.bus.bus_princ(prot)
+            while True:
+                if self.bus.q_read:
+                    break
+            while True:
+                read = self.bus.q_read[-1]
+                if (read[0] == self.name and
+                    read[1] == pos):
+                    break
+                    
+            self.mem_cache[pos] = (2,read[2])
+            return read[2]
         else:
             new_data= index[1]
             return new_data
 
     def run (self):
         i=0
-        while i< 5:
+        while True:
             i+=1
-            instr = self.control.snoop()
-            print ("estoy aqui :")
-            print (instr)
-            if instr:
-                index = self.mem_cache[instr[2]]
-                data = index[1]
-                if instr[0] == 0:
-                    self.mem_cache[instr[2]] = (1,data)
-                    print ("cache actualizada por lectura" + self.name)
-                else:
-                    self.mem_cache[instr[2]] = (2,data)
-                    print ("cache actualizada por escritura" + self.name)
+            mutex.acquire()
+            print("memory cache of the core "+ self. name+" " , self.mem_cache)
+            mutex.release()
+            time.sleep(1)
         
 
 class control_unit(threading.Thread):
+    global mutex
     
-    def __init__(self, name, bus):
+    def __init__(self, name, bus, mem_cache):
         threading.Thread.__init__(self)
         self.name = name
         self.bus = bus
+        self.mem_cache = mem_cache
         self.stoprequest = threading.Event()
 
     def write(self,msi):
         if msi == 2:
             msi = 0
+            mutex.acquire()
             print ("valor actualizado de S a M, proceder con la escritura")
+            mutex.release()
             return msi
         elif msi == 1:
-            print ("cache miss en escritura")
+            msi = 0
+            mutex.acquire()
+            print ("valor actualizado de I a M, proceder con la escritura")
+            mutex.release()
             return msi
         else:
+            mutex.acquire()
             print ("valor actualizado de M a M, proceder con la escritura")
+            mutex.release()
             return msi
 
     def read(self,msi):
         if msi == 2:
+            mutex.acquire()
             print ("proceder con la lectura de cache S a S")
+            mutex.release()
             return msi
         elif msi== 1:
+            mutex.acquire()
             print ("cache miss en lectura")
+            mutex.release()
             return msi
         else:
+            mutex.acquire()
             print ("proceder con la lectura de cache M a M")
+            mutex.release()
             return msi        
 
-    def snoop (self):
-        work = bus.snoop()
-        if work:
-            if work[1]!= self.name:
-                print ("actualizando cache snoop")
-                return work
 
     def run (self):
         while True:
-            a=1
+            #instruccion [0,"1",2,45]
+            instr = self.bus.snoop()
+            if instr:
+                if (instr[0] == 1 and
+                    instr[1] != self.name):
+                    self.mem_cache[instr[2]] = (1, self.mem_cache[instr[2]][1])
+                elif (instr[0] == 1 and
+                    instr[1] == self.name):
+                    self.mem_cache[instr[2]] = (2,instr[3])
+                elif (instr[0] == 0 and
+                      instr[1] != self.name and
+                      self.mem_cache[instr[2]][0] == 2):
+                    self.mem_cache[instr[2]] = (2,instr[3])
+
+                
+                
                     
     
-class bus (threading.Thread):    
+class bus (threading.Thread):
+    global mutex
     queue = []
-    q_snoop = deque([])
+    q_read = []
     
     def __init__(self,name,memory):
         threading.Thread.__init__(self)
@@ -168,48 +192,48 @@ class bus (threading.Thread):
         self.memory = memory
         self.stoprequest = threading.Event()
 
-    def bus_w (self):
-            instr = self.queue[0]
+    def bus_w (self,instr):
             pos = instr[2]
             data = instr[3]
             self.memory.write(pos,data)
-            print ("escritura exitosa hacia memoria")
-            self.queue = []
+            mutex.acquire()
+            print ("successful writing in the bus")
+            mutex.release()
 
-    def bus_r (self):
-            instr = self.queue[0]
+    def bus_r (self,instr):
             name = instr[1]
             pos = instr[2]
             data = self.memory.read(pos)
             read = [name,pos,data]
-            self.queue = []
-            return read
-            print ("lectura exitosa desde memoria")
+            self.q_read.append(read)
+            mutex.acquire()
+            print ("lsuccessful reading in the bus")
+            mutex.release()
 
     def bus_princ (self,prot):
-        self.queue.append(prot)
-        #self.q_snoop.append(prot)
-        print (self.queue)
-        #print (self.q_snoop)
-        #while self.queue:
-        if prot[0]== 1:
-            self.bus_w()
-        else:
-            read = self.bus_r()
-            return read
+        self.queue.append(prot)     
 
     def snoop(self):
-        if self.queue: 
-            instr = self.queue[0]
+        q = self.queue
+        if (len(q) > 0):   
+            instr = q[0]
             return instr
+        return [-1,-1,-1]
 
     def run (self):
         while True:
-            a=1
+            if self.queue:
+                instr = self.queue[0]
+                if instr[0]== 1:
+                    self.bus_w(instr)
+                else:
+                    self.bus_r(instr)
+                self.queue = self.queue[1:]
         
     
 class memory (threading.Thread):
     mem_princ = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+    global mutex
     
     def __init__(self,name):
         threading.Thread.__init__(self)
@@ -217,15 +241,22 @@ class memory (threading.Thread):
         self.stoprequest = threading.Event()
 
     def write (self, pos, data):
+        time.sleep(2)
         self.mem_princ[pos] = data
 
     def read (self, pos):
+        time.sleep(1)
         data = self.mem_princ[pos]
         return data
 
     def run (self):
         while True:
-            a=1
+            mutex.acquire()
+            print("//////////////////////////////////")
+            print("Memoria Principal " , self.mem_princ)
+            print("//////////////////////////////////")
+            mutex.release()
+            time.sleep(1)
 
 mutex = threading.Lock()
             
@@ -233,17 +264,11 @@ mutex = threading.Lock()
 princ_mem = memory("principal_memory")
 bus = bus("principal_bus", princ_mem)
 
-#Unidad de control
-control_unit1 = control_unit("1", bus)
-control_unit2 = control_unit("2", bus)
-control_unit3 = control_unit("3", bus)
-control_unit4 = control_unit("4", bus)
-
 #Caches
-cache1 = cache("1", control_unit1, bus)
-cache2 = cache("2", control_unit2, bus)
-cache3 = cache("3", control_unit3, bus)
-cache4 = cache("4", control_unit4, bus)
+cache1 = cache("1", bus)
+cache2 = cache("2", bus)
+cache3 = cache("3", bus)
+cache4 = cache("4", bus)
 
 #Cores
 core1 = processor("1",cache1)
@@ -253,11 +278,6 @@ core4 = processor("4",cache4)
 
 princ_mem.start()
 bus.start()
-
-control_unit1.start()
-control_unit2.start()
-control_unit3.start()
-control_unit4.start()
 
 cache1.start()
 cache2.start()
