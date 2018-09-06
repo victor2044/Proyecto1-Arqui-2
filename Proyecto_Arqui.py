@@ -268,7 +268,6 @@ mutex = threading.Lock()
 Gui = GUI()
 a =  "prueba"
 Gui.printCo("1",a)
-Gui.mainloop()
 Gui.start()
 #hilos unicos                   
 princ_mem = memory("principal_memory")
