@@ -3,7 +3,9 @@ import threading
 from GUI_Arqui import GUI
 from random import randint
 from collections import deque
- 
+
+gui = GUI()
+
 class processor(threading.Thread):
     global mutex
     
@@ -14,23 +16,23 @@ class processor(threading.Thread):
         self.stoprequest = threading.Event()
         
     def write (self):
-        mutex.acquire()
-        print ("core " + self.name +" escribiendo\n")
-        mutex.release()
         pos = randint(0,15)
         data = int(self.name)
+        mutex.acquire()
+        gui.printCore(self.name,"core " + self.name +" escribiendo en:"+str(pos))
+        mutex.release()
         self.cache.write(pos,data)
 
     def read (self):
-        mutex.acquire()
-        print ("core " + self.name +" leyendo\n")
-        mutex.release()
         pos = randint(0,15)
+        mutex.acquire()
+        gui.printCore(self.name,"core " + self.name +" leyendo en:"+str(pos))
+        mutex.release()
         data = self.cache.read(pos)
 
     def processing (self):
         mutex.acquire()
-        print ("core " + self.name +" processing\n")
+        gui.printCore(self.name,"core " + self.name +" procesando")        
         mutex.release()
         time.sleep(1)
 
@@ -265,10 +267,7 @@ mutex = threading.Lock()
 #/////////////////////////////////////////////
 
 #instancia de la interfaz
-Gui = GUI()
-a =  "prueba"
-Gui.printCo("1",a)
-Gui.start()
+gui.start()
 #hilos unicos                   
 princ_mem = memory("principal_memory")
 bus = bus("principal_bus", princ_mem)
