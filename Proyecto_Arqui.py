@@ -1,5 +1,6 @@
 import time
 import threading
+from GUI_Arqui import GUI
 from random import randint
 from collections import deque
  
@@ -17,7 +18,7 @@ class processor(threading.Thread):
         print ("core " + self.name +" escribiendo\n")
         mutex.release()
         pos = randint(0,15)
-        data = randint(0,64)
+        data = int(self.name)
         self.cache.write(pos,data)
 
     def read (self):
@@ -69,7 +70,7 @@ class cache(threading.Thread):
         time.sleep(0.5)
         bus.bus_princ(prot)
         mutex.acquire()
-        print ("escritura exitosa in the core " +self.name+",in the position :", pos)
+        print ("escritura exitosa in the core " +self.name+",in the position :", pos+1)
         mutex.release()
                    
     def read(self,pos):
@@ -79,13 +80,13 @@ class cache(threading.Thread):
         if validate == 0:
             new_data= index[1]
             mutex.acquire()
-            print ("lectura exitosa in the core "+ self.name+",in the position :", pos)
+            print ("lectura exitosa in the core "+ self.name+",in the position :", pos+1)
             mutex.release()
             time.sleep(0.25)
             return new_data
         elif validate == 1:
             mutex.acquire()
-            print ("cache miss in the core " +self.name+",in the position :", pos)
+            print ("cache miss in the core " +self.name+",in the position :", pos+1)
             mutex.release()
             time.sleep(0.25)
             data = index[1]
@@ -171,9 +172,6 @@ class control_unit(threading.Thread):
                 if (instr[0] == 1 and
                     instr[1] != self.name):
                    self.mem_cache[instr[2]] = (1, data1)
-                #elif (instr[0] == 1 and
-                #    instr[1] == self.name):
-                #    self.mem_cache[instr[2]] = (2,instr[3])
                 elif (instr[0] == 0 and
                       instr[1] != self.name and
                       self.mem_cache[instr[2]][0] == 2):
@@ -261,37 +259,46 @@ class memory (threading.Thread):
             time.sleep(0.5)
 
 mutex = threading.Lock()
-            
+
+#//////////////////////////////////////////////
+#Secuencia de inicializaion del programa
+#/////////////////////////////////////////////
+
+#instancia de la interfaz
+Gui = GUI()
+a =  "prueba"
+Gui.printCo("1",a)
+Gui.mainloop()
+Gui.start()
 #hilos unicos                   
 princ_mem = memory("principal_memory")
 bus = bus("principal_bus", princ_mem)
-
 #Caches
 cache1 = cache("1", bus)
 cache2 = cache("2", bus)
 cache3 = cache("3", bus)
 cache4 = cache("4", bus)
-
 #Cores
 core1 = processor("1",cache1)
 core2 = processor("2",cache2)
 core3 = processor("3",cache3)
 core4 = processor("4",cache4)
 
+#inicializacion de hilos
 princ_mem.start()
 bus.start()
-
 cache1.start()
 cache2.start()
 cache3.start()
 cache4.start()
-
 core1.start()
 core2.start()
 core3.start()
 core4.start()
-
+#indicacion de que los cores deben de esperar
 core1.join()
 core2.join()
 core3.join()
 core4.join()
+
+
