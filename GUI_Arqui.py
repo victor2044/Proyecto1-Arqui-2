@@ -101,7 +101,7 @@ def printCore3():
 
 def printCore4():
    while True:
-      f= open("core1.txt", "r")
+      f= open("core4.txt", "r")
       Core4.delete('1.0',END)
       Core4.insert('1.0',f.read())
       time.sleep(0.5)
